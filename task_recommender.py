@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 import networkx as nx
+import matplotlib.pyplot as plt
 import conf
 
 username = conf.username
@@ -36,17 +37,17 @@ class LocalJira(JIRA):
                 try:
                     all_project_issues = self.get_issues(project)
                 except Exception as e:
-                    print(e)
+                    #print(e)
                     continue
                 for issue in all_project_issues:
                     try:
                         time_diff = self.get_time_spent(issue.id)
-                        issues_list.append((issue.id,issue.raw['fields']['summary'],time_diff))
+                        issues_list.append((issue.id,issue.raw['fields']['summary'],time_diff,issue.raw['fields']['updated'].split('+')[0]))
                     except Exception as e:
-                        print(e)
+                        #print(e)
                         continue
         except Exception as e:
-            print(e)
+            #print(e)
             pass
         finally:
             return issues_list
@@ -75,7 +76,6 @@ class LocalJira(JIRA):
         for project in projects:
             if keyword.lower() in project.name.lower():
                 req_projects.append(project)
-        print(req_projects)
 
         return req_projects
 
@@ -111,17 +111,33 @@ class LocalJira(JIRA):
     def collect_jira_data(self,keyword):
         "Collect JIRA data for a keyword"
         if self.check_pickle_available(keyword):
-            print("Pickle obj found")
+            #print("Pickle obj found")
             issues_list = self.unpickle_data(keyword)
         else:
             projects = self.get_projects_using_keyword(keyword)
-            print("Obtained projects")
+            #print("Obtained projects")
             issues_list = self.get_issues_from_projects(projects)
             self.pickle_data(issues_list,keyword)
 
-        df = self.create_dataframe(issues_list,columns=['issue_id','summary','time_taken'])
+        df = self.create_dataframe(issues_list,columns=['issue_id','summary','time_taken','time_stamp'])
 
         return df
+
+    def plot_network_graph(self,data_frame,keyword):
+        "Plat a network graph"
+        data_frame = data_frame.sort_values(by=['time_stamp'])
+        graph = nx.path_graph(len(data_frame))
+        tasks = {}
+        for i in range(0,len(data_frame) -1):
+            tasks[i] = data_frame['summary'].iloc[i]
+
+        H=nx.relabel_nodes(graph,tasks)
+        for edge in H.edges():
+            print(edge)
+        nx.draw(H, with_labels=True, font_size=4)
+        filename = keyword + '.png'
+        plt.savefig(filename)
+        plt.show()
     
 if __name__ == '__main__':
     obj = LocalJira(server,username,apitoken)
@@ -129,15 +145,18 @@ if __name__ == '__main__':
     keyword = 'training'
     issues_df = obj.collect_jira_data(keyword)
     duplicate_df = issues_df[issues_df.duplicated(['summary'])]
-    duplicate_df = duplicate_df[duplicate_df['time_taken'].notna()]
-    print(duplicate_df.groupby(['summary']).mean().sort_values(by=['time_taken']))
-    print(duplicate_df['summary'][:10])
-    
+    obj.plot_network_graph(duplicate_df,keyword)
+    #duplicate_df = duplicate_df[duplicate_df['time_taken'].notna()]
+    #print(duplicate_df.groupby(['summary']).mean().sort_values(by=['time_taken']))
+    #print(duplicate_df['summary'][:10])
+
     # Onboarding data
     keyword = 'onboarding'
     issues_df = obj.collect_jira_data(keyword)
     duplicate_df = issues_df[issues_df.duplicated(['summary'])]
-    duplicate_df = duplicate_df[duplicate_df['time_taken'].notna()]
-    print(duplicate_df.groupby(['summary']).mean().sort_values(by=['time_taken']))
-    print(duplicate_df['summary'][:10])
+    obj.plot_network_graph(duplicate_df,keyword)
+    #print(duplicate_df.sort_values(by=['time_stamp']))
+    #duplicate_df = duplicate_df[duplicate_df['time_taken'].notna()]
+    #print(duplicate_df.groupby(['summary']).mean().sort_values(by=['time_taken']))
+    #print(duplicate_df['time_stamp'][:10])
 

@@ -13,6 +13,10 @@ class LocalJira(JIRA):
     def get_projects(self):
         return self.projects()
 
+    def get_issues(project_id):
+        issues = jira.search_issues(project_id)
+        return issues
+
     def get_time_spent(self,issue_id):
         issue = self.issue(issue_id, expand='changelog')
         time_spent = {}
@@ -31,8 +35,6 @@ class LocalJira(JIRA):
 
 if __name__ == '__main__':
     obj = LocalJira(server,username,apitoken)
-    #print(dir(obj))
-    #print(obj.get_projects())
     print(obj.get_time_spent('12194'))
 
 

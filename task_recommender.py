@@ -11,13 +11,18 @@ class LocalJira(JIRA):
         super().__init__(server=server,basic_auth=(username,apitoken))
 
     def get_projects(self):
+        "Get the projects"
+        
         return self.projects()
 
     def get_issues(project_id):
+        "Get the Issues"
         issues = jira.search_issues(project_id)
+
         return issues
 
     def get_time_spent(self,issue_id):
+        "Get the time spent on each issue"
         issue = self.issue(issue_id, expand='changelog')
         time_spent = {}
         changelog = issue.changelog
@@ -33,9 +38,19 @@ class LocalJira(JIRA):
 
         return time_difference
 
+    def get_projects_using_keyword(self,keyword):
+        "Get the projects that has the given keyword"
+        req_projects = []
+        projects = self.get_projects()
+        for project in projects:
+            if keyword.lower() in project.name.lower():
+                req_projects.append(project)
+        
+        return req_projects
+
 if __name__ == '__main__':
     obj = LocalJira(server,username,apitoken)
-    print(obj.get_time_spent('12194'))
+    print(obj.get_projects_using_keyword('onboarding'))
 
 
 

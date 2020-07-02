@@ -1,6 +1,8 @@
 from jira import JIRA
 import datetime
 import pickle
+import os
+import pandas as pd
 import conf
 
 username = conf.username
@@ -8,12 +10,14 @@ apitoken = conf.apitoken
 server = conf.server
 
 class LocalJira(JIRA):
+    "Local Jira object"
+
     def __init__(self,server,username,apitoken):
         super().__init__(server=server,basic_auth=(username,apitoken))
 
     def get_projects(self):
         "Get the projects"
-
+        
         return self.projects()
 
     def get_issues(self,project_id):
@@ -21,6 +25,16 @@ class LocalJira(JIRA):
         issues = self.search_issues("project='%s'"%project_id)
 
         return issues
+    
+    def get_issues_from_projects(self,projects_list):
+        "Get the issue from a project list"
+        issues_list = []
+        for project in projects:
+            all_project_issues = self.get_issues(project)
+            for issue in all_project_issues:
+                time_diff = self.get_time_spent(issue.id)
+                issues_list.append((issue.id,issue.raw['fields']['summary'],time_diff))
+        return issues_list
 
     def get_time_spent(self,issue_id):
         "Get the time spent on each issue"
@@ -49,20 +63,27 @@ class LocalJira(JIRA):
 
         return req_projects
 
+    def pickle_data(self,data_obj,filename):
+        "Pickle the data"
+        with open(filename,'ab') as pf:
+            pickle.dump(data_obj,pf)
 
 if __name__ == '__main__':
     obj = LocalJira(server,username,apitoken)
-    projects = obj.get_projects_using_keyword('onboading')
-    issues = {}
-    for project in projects:
-        issues['%s'%project.key] = obj.get_issues(project)
-        issues_list = []
-        for issue in issues['%s'%project.key]:
-            time_diff = obj.get_time_spent(issue.id)
-            issues_list.append({issue.raw['fields']['summary'] : time_diff})
-        issues['%s'%project.key] = issues_list
-            #print(issue.raw['fields']['summary'],time_diff)
-        #issues['%s'%project.key].add(issue.raw['fields']['summary'],time_diff)
-    print(issues)
+    #obj.get_projects()
+    if not os.path.exists('issues'):
+        projects = obj.get_projects_using_keyword('onboarding')
+        issues_list = obj.get_issues_from_projects(projects)
+        print(issues_list)
+        obj.pickle_data(issues_list,'issues')
+    with open('issues','rb') as pf:
+        issues = pickle.load(pf)
+    issues_df = pd.DataFrame(issues, columns = ['issue_id','summary','time_taken'])
+    pd.set_option('display.max_rows', None)
+    #print(issues_df)
+    #print(dir(issues_df))
+    print(issues_df[issues_df['summary'] == 'Create an html page for your test strategy report'])
+    print(issues_df.groupby(['summary']).mean())
+    #print(issues_df[issues_df.duplicated(['summary'])])
 
 

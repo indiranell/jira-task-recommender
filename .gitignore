@@ -2,3 +2,4 @@ conf.py
 __pycache__/
 training
 onboarding
+*.png

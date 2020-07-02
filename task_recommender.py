@@ -3,6 +3,7 @@ import datetime
 import pickle
 import os
 import pandas as pd
+import numpy as np
 import conf
 
 username = conf.username
@@ -51,7 +52,7 @@ class LocalJira(JIRA):
         if(time_spent.get('done') and time_spent.get('doing')):
             time_difference = datetime.datetime.fromisoformat(time_spent['done']) - datetime.datetime.fromisoformat(time_spent['doing'])
 
-            return time_difference.days * 8
+            return (time_difference.seconds//3600) * 8
 
     def get_projects_using_keyword(self,keyword):
         "Get the projects that has the given keyword"
@@ -82,8 +83,10 @@ if __name__ == '__main__':
     pd.set_option('display.max_rows', None)
     #print(issues_df)
     #print(dir(issues_df))
-    print(issues_df[issues_df['summary'] == 'Create an html page for your test strategy report'])
-    print(issues_df.groupby(['summary']).mean())
-    #print(issues_df[issues_df.duplicated(['summary'])])
+    #print(issues_df[issues_df['summary'] == 'Create an html page for your test strategy report'])
+    duplicate_df = issues_df[issues_df.duplicated(['summary'])]
+    duplicate_df = duplicate_df[duplicate_df['time_taken'].notna()]
+    #print(duplicate_df.sort_values(by=['time_taken']))
+    print(duplicate_df.groupby(['summary']).mean().sort_values(by=['time_taken']))
 
 

@@ -4,6 +4,7 @@ import pickle
 import os
 import pandas as pd
 import numpy as np
+import networkx as nx
 import conf
 
 username = conf.username
@@ -30,12 +31,25 @@ class LocalJira(JIRA):
     def get_issues_from_projects(self,projects_list):
         "Get the issue from a project list"
         issues_list = []
-        for project in projects:
-            all_project_issues = self.get_issues(project)
-            for issue in all_project_issues:
-                time_diff = self.get_time_spent(issue.id)
-                issues_list.append((issue.id,issue.raw['fields']['summary'],time_diff))
-        return issues_list
+        try:
+            for project in projects_list:
+                try:
+                    all_project_issues = self.get_issues(project)
+                except Exception as e:
+                    print(e)
+                    continue
+                for issue in all_project_issues:
+                    try:
+                        time_diff = self.get_time_spent(issue.id)
+                        issues_list.append((issue.id,issue.raw['fields']['summary'],time_diff))
+                    except Exception as e:
+                        print(e)
+                        continue
+        except Exception as e:
+            print(e)
+            pass
+        finally:
+            return issues_list
 
     def get_time_spent(self,issue_id):
         "Get the time spent on each issue"
@@ -61,6 +75,7 @@ class LocalJira(JIRA):
         for project in projects:
             if keyword.lower() in project.name.lower():
                 req_projects.append(project)
+        print(req_projects)
 
         return req_projects
 
@@ -69,24 +84,60 @@ class LocalJira(JIRA):
         with open(filename,'ab') as pf:
             pickle.dump(data_obj,pf)
 
+    def unpickle_data(self,filename):
+        "Unpickle and return the obj"
+        pobj = None
+        with open(filename,'rb') as pf:
+            pobj = pickle.load(pf)
+
+        return pobj
+
+    def check_pickle_available(self,filename):
+        "Check if a pickle avail"
+        if_avail = False
+        if os.path.exists(filename):
+            if_avail = True
+        
+        return if_avail
+
+    def create_dataframe(self,df_name,columns):
+        "Create a Pandas DataFrame"
+        df = pd.DataFrame(df_name,columns=columns)
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_colwidth', -1)
+
+        return df
+
+    def collect_jira_data(self,keyword):
+        "Collect JIRA data for a keyword"
+        if self.check_pickle_available(keyword):
+            print("Pickle obj found")
+            issues_list = self.unpickle_data(keyword)
+        else:
+            projects = self.get_projects_using_keyword(keyword)
+            print("Obtained projects")
+            issues_list = self.get_issues_from_projects(projects)
+            self.pickle_data(issues_list,keyword)
+
+        df = self.create_dataframe(issues_list,columns=['issue_id','summary','time_taken'])
+
+        return df
+    
 if __name__ == '__main__':
     obj = LocalJira(server,username,apitoken)
-    #obj.get_projects()
-    if not os.path.exists('issues'):
-        projects = obj.get_projects_using_keyword('onboarding')
-        issues_list = obj.get_issues_from_projects(projects)
-        print(issues_list)
-        obj.pickle_data(issues_list,'issues')
-    with open('issues','rb') as pf:
-        issues = pickle.load(pf)
-    issues_df = pd.DataFrame(issues, columns = ['issue_id','summary','time_taken'])
-    pd.set_option('display.max_rows', None)
-    #print(issues_df)
-    #print(dir(issues_df))
-    #print(issues_df[issues_df['summary'] == 'Create an html page for your test strategy report'])
+    # Training data
+    keyword = 'training'
+    issues_df = obj.collect_jira_data(keyword)
     duplicate_df = issues_df[issues_df.duplicated(['summary'])]
     duplicate_df = duplicate_df[duplicate_df['time_taken'].notna()]
-    #print(duplicate_df.sort_values(by=['time_taken']))
     print(duplicate_df.groupby(['summary']).mean().sort_values(by=['time_taken']))
-
+    print(duplicate_df['summary'][:10])
+    
+    # Onboarding data
+    keyword = 'onboarding'
+    issues_df = obj.collect_jira_data(keyword)
+    duplicate_df = issues_df[issues_df.duplicated(['summary'])]
+    duplicate_df = duplicate_df[duplicate_df['time_taken'].notna()]
+    print(duplicate_df.groupby(['summary']).mean().sort_values(by=['time_taken']))
+    print(duplicate_df['summary'][:10])
 

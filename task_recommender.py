@@ -1,5 +1,6 @@
 from jira import JIRA
 import datetime
+import pickle
 import conf
 
 username = conf.username
@@ -48,15 +49,20 @@ class LocalJira(JIRA):
 
         return req_projects
 
+
 if __name__ == '__main__':
     obj = LocalJira(server,username,apitoken)
     projects = obj.get_projects_using_keyword('onboading')
     issues = {}
     for project in projects:
-        issues['project'] = obj.get_issues(project)
-        for issue in issues['project']:
+        issues['%s'%project.key] = obj.get_issues(project)
+        issues_list = []
+        for issue in issues['%s'%project.key]:
             time_diff = obj.get_time_spent(issue.id)
-            print(issue.raw['fields']['summary'],time_diff)
-
+            issues_list.append({issue.raw['fields']['summary'] : time_diff})
+        issues['%s'%project.key] = issues_list
+            #print(issue.raw['fields']['summary'],time_diff)
+        #issues['%s'%project.key].add(issue.raw['fields']['summary'],time_diff)
+    print(issues)
 
 
